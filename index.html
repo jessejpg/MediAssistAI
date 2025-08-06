@@ -1,0 +1,178 @@
+{
+  "name": "mediassistai",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "openai": "^4.27.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  }
+}
+import React, { useState } from "react";
+
+const localKnowledge = {
+  "clinic hours": "Our clinic is open from 8 AM to 6 PM, Monday to Friday.",
+  "emergency number": "In case of emergency, call 911 immediately.",
+  "flu symptoms": "Common flu symptoms include fever, cough, sore throat, and body aches.",
+  "covid symptoms": "COVID-19 symptoms include fever, cough, shortness of breath, and loss of taste or smell."
+};
+
+function App() {
+  const [query, setQuery] = useState("");
+  const [chatLog, setChatLog] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const checkLocalKnowledge = (text) => {
+    const lower = text.toLowerCase();
+    for (const key in localKnowledge) {
+      if (lower.includes(key)) {
+        return localKnowledge[key];
+      }
+    }
+    return null;
+  };
+
+  const callOpenAI = async (prompt) => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/openai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await response.json();
+      setLoading(false);
+      return data.text;
+    } catch (error) {
+      setLoading(false);
+      return "Sorry, I couldn't reach the AI service.";
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    const userMessage = { sender: "user", text: query };
+    setChatLog((prev) => [...prev, userMessage]);
+
+    // Check local knowledge first
+    const localAnswer = checkLocalKnowledge(query);
+    if (localAnswer) {
+      const botMessage = { sender: "bot", text: `Local Info: ${localAnswer}` };
+      setChatLog((prev) => [...prev, botMessage]);
+      setQuery("");
+      return;
+    }
+
+    // Call OpenAI API
+    const aiResponse = await callOpenAI(query);
+    const botMessage = { sender: "bot", text: aiResponse };
+    setChatLog((prev) => [...prev, botMessage]);
+    setQuery("");
+  };
+
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>MediAssistAI</h1>
+      <div style={styles.chatBox}>
+        {chatLog.map((msg, idx) => (
+          <div
+            key={idx}
+            style={{
+              ...styles.message,
+              alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
+              backgroundColor: msg.sender === "user" ? "#DCF8C6" : "#FFF",
+            }}
+          >
+            {msg.text}
+          </div>
+        ))}
+        {loading && <div style={styles.message}>MediAssistAI is typing...</div>}
+      </div>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <input
+          type="text"
+          placeholder="Ask your medical question..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={styles.input}
+          disabled={loading}
+        />
+        <button type="submit" style={styles.button} disabled={loading}>
+          Ask
+        </button>
+      </form>
+      <p style={{ fontSize: 12, color: "#888", marginTop: 10 }}>
+        Powered by OpenAI GPT-4. Local knowledge answers instantly.
+      </p>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    maxWidth: 600,
+    margin: "40px auto",
+    padding: 20,
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    display: "flex",
+    flexDirection: "column",
+    height: "80vh",
+  },
+  title: {
+    textAlign: "center",
+    color: "#007acc",
+  },
+  chatBox: {
+    flex: 1,
+    border: "1px solid #ccc",
+    borderRadius: 8,
+    padding: 10,
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    backgroundColor: "#f9f9f9",
+  },
+  message: {
+    maxWidth: "80%",
+    padding: 10,
+    borderRadius: 10,
+    boxShadow: "0 1px 1px rgba(0,0,0,0.1)",
+  },
+  form: {
+    marginTop: 10,
+    display: "flex",
+    gap: 10,
+  },
+  input: {
+    flex: 1,
+    padding: 10,
+    fontSize: 16,
+    borderRadius: 8,
+    border: "1px solid #ccc",
+  },
+  button: {
+    padding: "10px 20px",
+    fontSize: 16,
+    borderRadius: 8,
+    border: "none",
+    backgroundColor: "#007acc",
+    color: "white",
+    cursor: "pointer",
+  },
+};
+
+export default App;
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
